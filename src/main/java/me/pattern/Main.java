@@ -79,7 +79,7 @@ public class Main {
                 this.cases = cases;
             }
 
-            MatchCase<T, R> then(Function<T, ? extends R> function) {
+            MatchCase<T, R> then(Function<? super T, ? extends R> function) {
                 List<Case> cases = new ArrayList<>();
                 cases.addAll(this.cases);
                 cases.add(new Case(When.this.predicate, function));
@@ -89,27 +89,21 @@ public class Main {
 
         }
 
-        class Otherwise implements Function<T, R> {
-
-            final Function<? super T, ? extends R> function;
-            final List<Case> cases;
-
-            Otherwise(Function<? super T, ? extends R> function, List<Case> cases) {
-                this.function = function;
-                this.cases = cases;
-            }
-
-            @Override
-            public R apply(T value) {
-                return cases.stream()
-                        .filter(c -> c.isApplicable(value))
-                        .findFirst()
-                        .map(c -> c.apply(value))
-                        .orElseGet(() -> function.apply(value));
-            }
-
+        class Otherwise extends When implements Function<T, R> {
+        	
+        	final MatchCase<T,R> matchCaseWithOtherwise;
+        	
+        	Otherwise(Function<? super T, ? extends R> function, List<Case> cases) {
+        		super(value -> true, cases); 
+        		matchCaseWithOtherwise = then(function);
+        	}
+        	
+        	@Override
+        	public R apply(T value) {
+        		return matchCaseWithOtherwise.apply(value);
+        	}
+        	
         }
-
 
         class Case implements Function<Object, R> {
 
