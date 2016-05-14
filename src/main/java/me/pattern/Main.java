@@ -55,7 +55,8 @@ public class Main {
         }
 
         Otherwise otherwise(Function<? super T, ? extends R> function) {
-            return new Otherwise(function, cases);
+        	MatchCase<T, R> then = when(value -> true).then(function);
+            return new Otherwise(then);
         }
 
 
@@ -89,13 +90,17 @@ public class Main {
 
         }
 
-        class Otherwise extends When implements Function<T, R> {
+//        An interface (which is like a static class), must be parameterized with <T,R> : 
+//        interface Otherwise<T,R> extends Function<T, R> {
+//        	
+//        };
+        
+        class Otherwise implements Function<T, R> {
         	
         	final MatchCase<T,R> matchCaseWithOtherwise;
         	
-        	Otherwise(Function<? super T, ? extends R> function, List<Case> cases) {
-        		super(value -> true, cases); 
-        		matchCaseWithOtherwise = then(function);
+        	Otherwise(MatchCase<T,R> matchCaseWithOtherwise) {
+        		this.matchCaseWithOtherwise = matchCaseWithOtherwise;
         	}
         	
         	@Override
