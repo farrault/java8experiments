@@ -11,19 +11,25 @@ import java.util.function.Predicate;
 public class Main {
 
     public static void main(String[] args) {
-        List<?> values = Arrays.asList(new Child(), "hello", 1, 1.5);
+//        List<?> values = Arrays.asList(new Child(), "hello", 1, 1.5);
+        List<? extends Root> values = Arrays.asList(new Child(), new Child2());
 
         values.stream()
                 .map(
-                        match()
-                                .whenIs("hello").then(__ -> "hello world")
-                                .whenTypeIs(Integer.class).then(i -> "int: " + i)
+//                		Main.<Root,String>match()
+                		matchTo(String.class)
+//                			match()
+//                                .whenIs("hello").then(__ -> "hello world")
+//                                .whenTypeIs(Integer.class).then(i -> "int: " + i)
                                 .whenTypeIs(Root.class).then(r -> "name : " + r.getName())
                                 .otherwise(__ -> "what else!")
+//                                .otherwise(__ -> 1)
                 )
                 .forEach(System.out::println);
     }
 
+    // ----
+    
     static abstract class Root {
     	abstract String getName();
     }
@@ -36,57 +42,67 @@ public class Main {
 		}
     	
     }
-    
+    static class Child2 extends Child {
+    	
+    	@Override
+    	String getName() {
+    		return "Child2";
+    	}
+    	
+    }
 
-    static <R> MatchCase<R> match() {
+    // ----
+
+    // A l'usage : le paramètre I ne sert pas à grand chose => il faut le spécifier pour qu'il soit utile
+    static <I,R> MatchCase<I,R> match() {
         return new MatchCase<>();
     }
+    static <I,R> MatchCase<I,R> matchTo(Class<R> clazz) {
+    	return new MatchCase<>();
+    }
     
-    static class MatchCase<R> implements Function<Object, R> {
+    static class MatchCase<I,R> implements Function<I, R> {
 
-        final List<Case<?,R>> cases;
+        final List<Case<? extends I,R>> cases;
 
         MatchCase() {
             this(Collections.emptyList());
         }
 
-        MatchCase(List<Case<?,R>> cases) {
+        MatchCase(List<Case<? extends I,R>> cases) {
             this.cases = cases;
         }
 
-        <T> When<T,R> when(Predicate<Object> predicate) {
+        <T extends I> When<I, T,R> when(Predicate<Object> predicate) {
         	return function -> addCase(predicate,function);
         }
         
-    	private <T> MatchCase<R> addCase(Predicate<Object> predicate, Function<T, ? extends R> function) {
+    	private <T extends I> MatchCase<I,R> addCase(Predicate<Object> predicate, Function<T, ? extends R> function) {
     		Case<T,R> newCase = new Case<T,R>(predicate, function);
     		
-    		List<Case<?,R>> cases = new ArrayList<>();
+    		List<Case<? extends I,R>> cases = new ArrayList<>();
     		cases.addAll(this.cases); // // Attention : capture du contexte => "leak" mémoire => ou pas ... on peut chainer ...
 			cases.add(newCase);
     		
-    		return new MatchCase<R>(cases); // parcequ'on est immutable à la base là... mais bon ...
+    		return new MatchCase<I,R>(cases); // parcequ'on est immutable à la base là... mais bon ...
     	}
 
-        <T> When<T,R> whenIs(T pattern) {
+        <T extends I> When<I,T,R> whenIs(T pattern) {
             return when(pattern::equals);
         }
 
-        <T> When<T,R> whenTypeIs(Class<T> cls) {
-            return when(v -> {
-        		System.out.println("---->"+v);
-        		return cls.isAssignableFrom(v.getClass()); // isAssignableFrom est-il encore nécessaire ? !! OUI carrément !
-            });
+        <T extends I> When<I,T,R> whenTypeIs(Class<T> cls) {
+            return when(v -> cls.isAssignableFrom(v.getClass())); // isAssignableFrom est-il encore nécessaire ? !! OUI carrément !
         }
 
-        Otherwise<R> otherwise(Function<Object, ? extends R> function) {
-        	MatchCase<R> then = addCase(value -> true, function);
-            return (Otherwise<R>) ( then::apply );
+        Otherwise<I,R> otherwise(Function<I, ? extends R> function) {
+        	MatchCase<I,R> then = addCase(value -> true, function);
+            return (Otherwise<I,R>) ( then::apply );
         }
 
 
         @Override
-        public R apply(Object value) {
+        public R apply(I value) {
             return cases.stream()
                     .filter(c -> c.isApplicable(value))
                     .findFirst()
@@ -96,15 +112,15 @@ public class Main {
 
     }
     
-    interface When<T,R> {
-    	MatchCase<R> then(Function<T, ? extends R> function);
+    interface When<I,T,R> {
+    	MatchCase<I,R> then(Function<T, ? extends R> function);
     }
 
-    interface Otherwise<R> extends Function<Object,R> {
+    interface Otherwise<I,R> extends Function<I,R> {
     	
     };
     
-    static class Case<T,R> { // implements Function<ObjecR> {
+    static class Case<T,R> {
     	
     	final Predicate<Object> predicate; // TODO : passer le prédicate en T ?
     	final Function<T, ? extends R> function;
@@ -116,15 +132,10 @@ public class Main {
     	}
     	
     	boolean isApplicable(Object object) {
-    		System.out.println("->"+object);
-    		// TODO : tester que c'est bien un T ?
-    		return predicate.test((Object)object);   // Comment ca peut fonctionner ??? => C'est à cause du type erasure ... au runtime c'est un (Object)
+    		return predicate.test((Object)object);
     	}
     	
-//    	@Override
-//    	/*public*/ R apply(T object) {
     	/*public*/ R apply(Object object) { // peut pas être T sinon impossible de faire le cast au dessus
-//    		return function.apply((T)object);
     		return function.apply((T)object);
     	}
     	
