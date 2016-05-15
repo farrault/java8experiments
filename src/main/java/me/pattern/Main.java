@@ -72,7 +72,7 @@ public class Main {
     }
 
     // -------------------------
-    // PUBLIC :
+    // PUBLIC : DSL
     
     // A l'usage : le paramètre I ne sert pas à grand chose => il faut le spécifier pour qu'il soit utile
     static <I,R> MatchCase<I,R> match() {
@@ -113,7 +113,7 @@ public class Main {
     		Case<T,R> newCase = new Case<T,R>(predicate, function);
     		
     		List<Case<? extends I,R>> cases = new ArrayList<>();
-    		cases.addAll(this.cases); // // Attention : capture du contexte => "leak" mémoire => ou pas ... on peut chainer ...
+    		cases.addAll(this.cases); // // Attention : capture du contexte => "leak" mémoire ou pas ? ==> En fait non, la lambda When est garbage-collectable une fois qu'on a appelé sa méthode then...
 			cases.add(newCase);
     		
     		return new MatchCase<I,R>(cases); // parcequ'on est immutable à la base là... mais bon ...
@@ -128,7 +128,6 @@ public class Main {
         }
 
         Otherwise<I,R> otherwise(Function<? super I, ? extends R> function) {
-//       	Otherwise<I,R> otherwise(Function<I, R> function) {
         	MatchCase<I,R> then = addCase(value -> true, function);
             return (Otherwise<I,R>) ( then::apply );
         }
